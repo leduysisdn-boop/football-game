@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soccer Penalty Shootout</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#ffd700;--cyan:#00e5ff;--red:#ff1744;--green:#00e676;
+  --gk-j1:#ff6b00;--gk-j2:#cc4400;
+  --gk-p1:#1a2a4a;--gk-p2:#0d1830;
+  --pt-j1:#1565c0;--pt-j2:#0d3d7a;
+  --pt-p1:#111;--pt-p2:#222;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#050d1a;color:#fff;font-family:'Barlow Condensed',sans-serif;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  min-height:100vh;overflow:hidden;user-select:none}
+#game-wrapper{display:flex;flex-direction:column;align-items:center;gap:10px}
+
+/* HUD */
+#top-hud{width:1000px;display:flex;justify-content:space-between;align-items:center;padding:0 4px}
+.hud-panel{background:rgba(0,0,0,0.78);border:1px solid rgba(255,255,255,0.12);border-radius:8px;
+  padding:8px 18px;display:flex;gap:20px;align-items:center}
+.hud-stat{text-align:center}
+.hud-stat .lbl{font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.4);text-transform:uppercase;display:block}
+.hud-stat .val{font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;color:var(--gold)}
+.val.cyan{color:var(--cyan)}.val.green{color:var(--green)}.val.wh{color:#fff}
+#diff-panel{display:flex;gap:6px}
+.diff-btn{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;
+  padding:6px 14px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);cursor:pointer;transition:all .15s}
+.diff-btn:hover{background:rgba(255,255,255,0.1);color:#fff}
+.diff-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(255,215,0,0.1)}
+.diff-btn.active.hard{border-color:var(--red);color:var(--red);background:rgba(255,23,68,0.1)}
+
+/* GAME CONTAINER */
+#game-container{position:relative;width:1000px;height:580px;border-radius:14px;overflow:hidden;
+  border:2px solid rgba(255,255,255,0.1);
+  box-shadow:0 0 60px rgba(0,100,200,0.15),0 30px 60px rgba(0,0,0,0.6)}
+
+/* BACKGROUND */
+#bg-sky{position:absolute;inset:0;
+  background:linear-gradient(175deg,#0a1628 0%,#1a3a5c 44%,#2e6b29 44%,#3d8b37 100%)}
+#bg-sky::before{content:'';position:absolute;top:26%;left:0;right:0;height:19%;
+  background:rgba(0,0,0,0.38);
+  clip-path:polygon(0% 80%,2% 42%,5% 68%,8% 30%,11% 62%,14% 24%,17% 56%,20% 19%,
+    23% 52%,26% 14%,29% 46%,32% 9%,35% 42%,38% 11%,41% 39%,44% 7%,47% 36%,50% 7%,
+    53% 39%,56% 11%,59% 42%,62% 9%,65% 46%,68% 14%,71% 52%,74% 19%,77% 56%,
+    80% 24%,83% 62%,86% 30%,89% 68%,92% 42%,95% 66%,100% 44%,100% 100%,0% 100%)}
+/* pitch markings */
+#pitch-lines{position:absolute;bottom:0;left:0;right:0;height:56%;pointer-events:none}
+/* penalty spot */
+#penalty-spot{position:absolute;width:10px;height:10px;border-radius:50%;
+  background:rgba(255,255,255,0.45);bottom:62px;left:50%;transform:translateX(-50%);z-index:1}
+/* penalty arc */
+#penalty-arc{position:absolute;width:300px;height:100px;
+  border:3px solid rgba(255,255,255,0.12);border-bottom:none;border-radius:150px 150px 0 0;
+  bottom:58px;left:50%;transform:translateX(-50%);z-index:1}
+/* 6-yard box */
+#six-box{position:absolute;width:420px;height:70px;
+  border:3px solid rgba(255,255,255,0.12);border-bottom:none;
+  bottom:0;left:50%;transform:translateX(-50%);z-index:1}
+
+/* GOAL */
+#goal-frame{position:absolute;top:58px;left:80px;width:840px;height:215px;
+  border:8px solid #eee;border-bottom:none;z-index:2;
+  box-shadow:inset 0 0 40px rgba(0,0,0,0.3),0 0 0 2px rgba(0,0,0,0.4)}
+#goal-frame::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px);
+  background-size:22px 22px}
+
+/* TARGET RINGS */
+.target-ring{position:absolute;width:72px;height:72px;border:4px dashed rgba(0,229,255,0.5);
+  border-radius:50%;animation:spin-ring 3s linear infinite;
+  display:flex;justify-content:center;align-items:center;box-shadow:0 0 14px rgba(0,229,255,0.2)}
+.target-ring::after{content:'';width:22px;height:22px;background:rgba(255,100,0,0.7);
+  border-radius:50%;box-shadow:0 0 10px rgba(255,100,0,0.5)}
+@keyframes spin-ring{to{transform:rotate(360deg)}}
+#tgt-tl{top:8px;left:8px}#tgt-tr{top:8px;right:8px}
+#tgt-bl{bottom:8px;left:8px}#tgt-br{bottom:8px;right:8px}
+
+/* ═══════════════════════════════════════
+   GOALKEEPER — z-index:4, orange jersey
+═══════════════════════════════════════ */
+#goalkeeper{
+  position:absolute;width:80px;height:165px;
+  z-index:4;transform-origin:50% 100%;
+  filter:drop-shadow(0 8px 12px rgba(0,0,0,0.55));
+  will-change:transform,left,top;
+  transition:left 0.06s linear,top 0.06s linear; /* smooth patrol only */
+}
+#goalkeeper.no-transition{transition:none}
+
+.gk-head{position:absolute;width:28px;height:28px;left:26px;top:0;
+  border-radius:50%;background:radial-gradient(circle at 38% 32%,#fddcaa,#e8a060);border:2px solid #7a4520}
+.gk-head::before{content:'';position:absolute;top:-3px;left:-1px;width:26px;height:12px;
+  background:#1a1a1a;border-radius:14px 14px 3px 3px}
+.gk-head::after{content:'';position:absolute;top:7px;left:5px;width:5px;height:5px;
+  background:rgba(255,255,255,0.28);border-radius:50%}
+
+.gk-torso-wrap{position:absolute;width:80px;height:70px;left:0;top:26px}
+.gk-body{position:absolute;width:44px;height:66px;left:18px;top:0;
+  background:linear-gradient(155deg,var(--gk-j1),var(--gk-j2));
+  border-radius:10px 10px 4px 4px;border:2px solid #7a2200}
+.gk-body::before{content:'';position:absolute;top:0;left:9px;width:24px;height:18px;
+  background:rgba(255,255,255,0.13);clip-path:polygon(0 0,100% 0,75% 100%,25% 100%)}
+.gk-body::after{content:'1';position:absolute;top:20px;left:50%;transform:translateX(-50%);
+  font-family:'Bebas Neue',sans-serif;font-size:17px;color:rgba(255,255,255,0.55)}
+
+.gk-arm-l,.gk-arm-r{position:absolute;width:14px;height:46px;top:4px;
+  background:linear-gradient(to bottom,var(--gk-j1) 55%,#fddcaa 55%);
+  border-radius:6px;border:2px solid #7a2200}
+.gk-arm-l{left:2px;transform-origin:top right;transform:rotate(20deg)}
+.gk-arm-r{right:2px;transform-origin:top left;transform:rotate(-20deg)}
+.gk-glove{position:absolute;width:17px;height:18px;bottom:-8px;left:-2px;
+  background:radial-gradient(circle at 40% 40%,#ffe033,#b8860b);
+  border:1.5px solid #886600;border-radius:5px;box-shadow:0 2px 5px rgba(0,0,0,0.45)}
+
+.gk-lower{position:absolute;width:80px;left:0;top:88px}
+.gk-pant-l,.gk-pant-r{position:absolute;width:18px;height:34px;top:0;
+  border-radius:5px 5px 3px 3px;
+  background:linear-gradient(to bottom,var(--gk-p1),var(--gk-p2));border:1.5px solid #0a0f1f}
+.gk-pant-l{left:16px;transform-origin:top center}
+.gk-pant-r{left:44px;transform-origin:top center}
+.gk-pant-l::before,.gk-pant-r::before{content:'';position:absolute;top:0;width:3px;height:100%;
+  background:rgba(255,255,255,0.18);border-radius:2px}
+.gk-pant-l::before{left:3px}.gk-pant-r::before{right:3px}
+
+.gk-shin-l,.gk-shin-r{position:absolute;width:14px;height:30px;bottom:-34px;left:2px;
+  border-radius:3px;background:linear-gradient(to bottom,#e8e8e8,#bbb);border:1.5px solid #999}
+.gk-shin-l::before,.gk-shin-r::before{content:'';position:absolute;top:2px;left:2px;
+  width:6px;height:14px;background:rgba(0,100,220,0.35);border-radius:2px}
+.gk-boot-l,.gk-boot-r{position:absolute;width:18px;height:11px;bottom:-12px;left:-2px;
+  background:#222;border-radius:3px 5px 4px 3px;border:1.5px solid #111;box-shadow:0 3px 4px rgba(0,0,0,0.5)}
+.gk-boot-l::after,.gk-boot-r::after{content:'';position:absolute;right:-2px;top:0;width:5px;height:100%;
+  background:#333;border-radius:0 4px 3px 0}
+
+/* GK POSE CLASSES (limb angles only, body movement via JS) */
+.gk-pose-dive-left  .gk-arm-l{transform:rotate(-148deg) translateY(-3px)!important}
+.gk-pose-dive-left  .gk-arm-r{transform:rotate(-14deg)!important}
+.gk-pose-dive-left  .gk-pant-l{transform:rotate(-22deg)}
+.gk-pose-dive-left  .gk-pant-r{transform:rotate(-8deg)}
+.gk-pose-dive-right .gk-arm-r{transform:rotate(148deg) translateY(-3px)!important}
+.gk-pose-dive-right .gk-arm-l{transform:rotate(14deg)!important}
+.gk-pose-dive-right .gk-pant-r{transform:rotate(22deg)}
+.gk-pose-dive-right .gk-pant-l{transform:rotate(8deg)}
+.gk-pose-crouch .gk-head{top:14px}
+.gk-pose-crouch .gk-body{top:8px}
+.gk-pose-crouch .gk-arm-l{transform:rotate(-86deg)!important;top:8px;left:0}
+.gk-pose-crouch .gk-arm-r{transform:rotate(86deg)!important;top:8px;right:0}
+.gk-pose-crouch .gk-pant-l{transform:rotate(-28deg)}
+.gk-pose-crouch .gk-pant-r{transform:rotate(28deg)}
+.gk-pose-slide-left  .gk-pant-l{transform:rotate(32deg)}
+.gk-pose-slide-left  .gk-pant-r{transform:rotate(-12deg)}
+.gk-pose-slide-left  .gk-arm-l{transform:rotate(-108deg)!important;top:2px}
+.gk-pose-slide-left  .gk-arm-r{transform:rotate(-32deg)!important;top:2px}
+.gk-pose-slide-right .gk-pant-r{transform:rotate(-32deg)}
+.gk-pose-slide-right .gk-pant-l{transform:rotate(12deg)}
+.gk-pose-slide-right .gk-arm-r{transform:rotate(108deg)!important;top:2px}
+.gk-pose-slide-right .gk-arm-l{transform:rotate(32deg)!important;top:2px}
+
+/* ═══════════════════════════════════════
+   PENALTY TAKER  — blue jersey, black pants
+   Positioned at bottom center, facing goal
+═══════════════════════════════════════ */
+#penalty-taker{
+  position:absolute;
+  width:70px;height:155px;
+  z-index:6;
+  transform-origin:50% 100%;
+  filter:drop-shadow(0 6px 10px rgba(0,0,0,0.5));
+  left:465px; /* centred: 500-35 */
+  bottom:40px;
+  transition:bottom 0.5s ease-out, left 0.4s ease-out;
+}
+/* run-up animation triggered by JS class */
+#penalty-taker.running{
+  animation:runUp 0.55s ease-in forwards;
+}
+@keyframes runUp{
+  0%{transform:translateY(0) scale(1)}
+  20%{transform:translateY(-12px) rotate(-3deg)}
+  40%{transform:translateY(-28px) rotate(3deg)}
+  60%{transform:translateY(-40px) scale(1.03)}
+  80%{transform:translateY(-18px) rotate(-2deg)}
+  100%{transform:translateY(0) scale(1)}
+}
+
+/* TAKER HEAD */
+.pt-head{position:absolute;width:26px;height:26px;left:22px;top:0;
+  border-radius:50%;background:radial-gradient(circle at 38% 32%,#fddcaa,#c8824a);border:2px solid #7a4520}
+.pt-head::before{content:'';position:absolute;top:-3px;left:-1px;width:24px;height:11px;
+  background:#333;border-radius:12px 12px 3px 3px}
+
+/* TAKER TORSO */
+.pt-torso-wrap{position:absolute;width:70px;height:68px;left:0;top:24px}
+.pt-body{position:absolute;width:40px;height:60px;left:15px;top:0;
+  background:linear-gradient(155deg,var(--pt-j1),var(--pt-j2));
+  border-radius:10px 10px 4px 4px;border:2px solid #08285c}
+.pt-body::before{content:'';position:absolute;top:0;left:8px;width:22px;height:16px;
+  background:rgba(255,255,255,0.12);clip-path:polygon(0 0,100% 0,75% 100%,25% 100%)}
+.pt-body::after{content:'10';position:absolute;top:18px;left:50%;transform:translateX(-50%);
+  font-family:'Bebas Neue',sans-serif;font-size:16px;color:rgba(255,255,255,0.55)}
+
+.pt-arm-l,.pt-arm-r{position:absolute;width:12px;height:42px;top:4px;
+  background:linear-gradient(to bottom,var(--pt-j1) 55%,#fddcaa 55%);
+  border-radius:5px;border:2px solid #08285c}
+.pt-arm-l{left:1px;transform-origin:top right;transform:rotate(22deg)}
+.pt-arm-r{right:1px;transform-origin:top left;transform:rotate(-22deg)}
+
+/* TAKER LOWER */
+.pt-lower{position:absolute;width:70px;left:0;top:82px}
+.pt-pant-l,.pt-pant-r{position:absolute;width:16px;height:32px;top:0;
+  border-radius:4px 4px 3px 3px;
+  background:linear-gradient(to bottom,var(--pt-p1),var(--pt-p2));border:1.5px solid #000}
+.pt-pant-l{left:13px;transform-origin:top center}
+.pt-pant-r{left:40px;transform-origin:top center}
+.pt-shin-l,.pt-shin-r{position:absolute;width:13px;height:28px;bottom:-32px;left:1px;
+  border-radius:3px;background:linear-gradient(to bottom,#e8e8e8,#bbb);border:1.5px solid #999}
+.pt-boot-l,.pt-boot-r{position:absolute;width:17px;height:10px;bottom:-11px;left:-2px;
+  background:#1a1a1a;border-radius:3px 5px 4px 3px;border:1.5px solid #000;box-shadow:0 3px 4px rgba(0,0,0,0.5)}
+
+/* TAKER KICK ANIMATION */
+#penalty-taker.kicking .pt-pant-r{
+  animation:kickLeg 0.35s ease-out forwards;transform-origin:top center}
+@keyframes kickLeg{
+  0%  {transform:rotate(0deg)}
+  30% {transform:rotate(-30deg)}/* wind-back */
+  70% {transform:rotate(55deg)} /* kick through */
+  100%{transform:rotate(40deg)}
+}
+#penalty-taker.kicking .pt-arm-l{
+  animation:kickArmL 0.35s ease-out forwards;transform-origin:top right}
+@keyframes kickArmL{
+  0%  {transform:rotate(22deg)}
+  50% {transform:rotate(55deg)}
+  100%{transform:rotate(35deg)}
+}
+#penalty-taker.kicking .pt-arm-r{
+  animation:kickArmR 0.35s ease-out forwards;transform-origin:top left}
+@keyframes kickArmR{
+  0%  {transform:rotate(-22deg)}
+  50% {transform:rotate(-50deg)}
+  100%{transform:rotate(-30deg)}
+}
+
+/* BALL */
+#soccer-ball{
+  position:absolute;width:32px;height:32px;border-radius:50%;z-index:7;
+  background:radial-gradient(circle at 35% 35%,#fff 0%,#ddd 50%,#aaa 100%);
+  box-shadow:inset -4px -4px 8px rgba(0,0,0,0.28),0 4px 14px rgba(0,0,0,0.5)}
+/* ball curve trail */
+#ball-trail{position:absolute;z-index:6;pointer-events:none}
+.trail-dot{position:absolute;border-radius:50%;background:rgba(255,200,0,0.35);pointer-events:none}
+
+/* AIM ARROW */
+#aim-system{position:absolute;bottom:108px;left:500px;width:6px;height:96px;
+  background:linear-gradient(to top,rgba(255,255,255,0),rgba(0,255,120,0.95));
+  transform-origin:bottom center;z-index:8;filter:drop-shadow(0 0 6px rgba(0,255,120,0.5))}
+#aim-pointer{position:absolute;top:-16px;left:-13px;width:0;height:0;
+  border-left:16px solid transparent;border-right:16px solid transparent;
+  border-bottom:22px solid #00ff78;filter:drop-shadow(0 0 8px #00ff78)}
+#curve-indicator{
+  position:absolute;bottom:210px;left:460px;width:80px;
+  font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--cyan);
+  z-index:10;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s;
+  text-shadow:0 0 8px var(--cyan)}
+#curve-indicator.visible{opacity:1}
+
+/* CURVE BALL SHADOW PATH — shown while aiming with curl */
+#curve-path{position:absolute;z-index:3;pointer-events:none;opacity:0;transition:opacity .3s}
+#curve-path.visible{opacity:1}
+.curve-ghost{position:absolute;width:14px;height:14px;border-radius:50%;
+  background:rgba(0,229,255,0.18);border:1px solid rgba(0,229,255,0.35);
+  transform:translate(-50%,-50%)}
+
+/* SEGMENTED POWER */
+#power-wrap{position:absolute;right:20px;bottom:40px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;z-index:10}
+#power-label2{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:2px;
+  color:rgba(255,255,255,0.45);margin-bottom:2px}
+#power-segments{display:flex;flex-direction:column-reverse;gap:3px}
+.pseg{width:32px;height:12px;border-radius:3px;
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);
+  transition:background .04s,box-shadow .04s}
+.pseg.zone-green{border-color:rgba(0,230,118,.4)}
+.pseg.zone-yellow{border-color:rgba(255,235,59,.4)}
+.pseg.zone-red{border-color:rgba(255,82,82,.4)}
+.pseg.zone-purple{border-color:rgba(170,0,255,.4)}
+.pseg.lit.zone-green{background:#00e676;box-shadow:0 0 8px #00e676}
+.pseg.lit.zone-yellow{background:#ffeb3b;box-shadow:0 0 8px #ffeb3b}
+.pseg.lit.zone-red{background:#ff5252;box-shadow:0 0 8px #ff5252}
+.pseg.lit.zone-purple{background:#aa00ff;box-shadow:0 0 10px #aa00ff}
+#sweet-bracket{position:absolute;right:56px;width:20px;
+  font-family:'Bebas Neue',sans-serif;font-size:9px;letter-spacing:1px;
+  color:rgba(255,234,0,0.7);text-align:right;pointer-events:none}
+#power-val{font-family:'Bebas Neue',sans-serif;font-size:20px;
+  color:#fff;margin-top:2px;min-width:32px;text-align:center}
+
+/* ACTION BTN */
+#action-btn{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+  width:170px;padding:13px 0;background:var(--gold);color:#000;border:none;border-radius:7px;
+  font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;
+  cursor:pointer;z-index:12;box-shadow:0 5px 0 #9a7c00,0 0 20px rgba(255,215,0,0.25);
+  transition:transform .08s,box-shadow .08s}
+#action-btn:active{transform:translateX(-50%) translateY(3px);box-shadow:0 2px 0 #9a7c00}
+
+/* SHOT SELECTOR */
+#shot-selector{position:absolute;bottom:22px;left:22px;
+  display:flex;flex-direction:column;gap:5px;z-index:11}
+.shot-btn{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;
+  padding:5px 10px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.15);
+  background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.45);cursor:pointer;transition:all .15s}
+.shot-btn:hover{color:#fff;border-color:rgba(255,255,255,0.4)}
+.shot-btn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,0.1)}
+
+/* ANNOUNCER */
+#status-announcer{position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(0.3);
+  font-family:'Bebas Neue',sans-serif;font-size:64px;letter-spacing:4px;
+  text-shadow:4px 4px 0 #000,-4px -4px 0 #000,4px -4px 0 #000,-4px 4px 0 #000,
+    0 0 30px currentColor;
+  opacity:0;z-index:20;pointer-events:none;
+  transition:all .22s cubic-bezier(0.175,0.885,0.32,1.275)}
+#status-announcer.active{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#streak-popup{position:absolute;top:35%;left:50%;
+  transform:translate(-50%,-50%) scale(0);
+  font-family:'Bebas Neue',sans-serif;font-size:28px;
+  color:var(--gold);text-shadow:0 0 20px var(--gold);
+  opacity:0;z-index:19;pointer-events:none;transition:all .2s;letter-spacing:2px}
+#streak-popup.active{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* SHOT TRACKER */
+#shot-tracker{position:absolute;bottom:78px;right:60px;
+  display:flex;flex-direction:column;gap:3px;align-items:center;z-index:10}
+.shot-dot{width:10px;height:10px;border-radius:50%;
+  background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);transition:all .2s}
+.shot-dot.goal{background:var(--green);border-color:var(--green);box-shadow:0 0 6px var(--green)}
+.shot-dot.miss{background:var(--red);border-color:var(--red)}
+.shot-dot.save{background:var(--cyan);border-color:var(--cyan)}
+
+/* NET RIPPLE */
+#net-ripple{position:absolute;top:58px;left:80px;width:840px;height:215px;
+  z-index:3;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,rgba(255,255,255,0.18) 0%,transparent 70%)}
+#net-ripple.active{animation:ripple-fade .55s ease-out forwards}
+@keyframes ripple-fade{0%{opacity:.9;transform:scale(0.9)}100%{opacity:0;transform:scale(1.1)}}
+
+/* CONFETTI */
+.confetti-piece{position:absolute;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:18}
+
+/* INSTRUCTIONS */
+#instr{position:absolute;top:14px;right:14px;
+  background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.1);
+  border-radius:8px;padding:8px 12px;font-size:10px;
+  color:rgba(255,255,255,0.45);z-index:10;line-height:1.65;max-width:185px}
+#instr span{color:var(--gold)}
+
+/* PHASE LABEL */
+#phase-label{position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:3px;
+  color:rgba(255,255,255,0.4);z-index:10;pointer-events:none}
+
+@keyframes powerFlash{0%,100%{opacity:1}50%{opacity:0.4}}
+.flash{animation:powerFlash .15s 3}
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+  <div id="top-hud">
+    <div class="hud-panel">
+      <div class="hud-stat"><span class="lbl">Score</span><span class="val" id="ui-score">0</span></div>
+      <div class="hud-stat"><span class="lbl">High Score</span><span class="val wh" id="ui-high">0</span></div>
+      <div class="hud-stat"><span class="lbl">Multiplier</span><span class="val cyan" id="ui-mult">1.0x</span></div>
+      <div class="hud-stat"><span class="lbl">Streak</span><span class="val green" id="ui-streak">0</span></div>
+      <div class="hud-stat"><span class="lbl">Shots</span><span class="val wh" id="ui-shots">0</span></div>
+    </div>
+    <div id="diff-panel">
+      <button class="diff-btn active" onclick="setDiff('easy')">EASY</button>
+      <button class="diff-btn" onclick="setDiff('medium')">MEDIUM</button>
+      <button class="diff-btn hard" onclick="setDiff('hard')">HARD</button>
+    </div>
+  </div>
+
+  <div id="game-container">
+    <div id="bg-sky"></div>
+    <div id="pitch-lines">
+      <div id="penalty-spot"></div>
+      <div id="penalty-arc"></div>
+      <div id="six-box"></div>
+    </div>
+    <div id="net-ripple"></div>
+
+    <div id="goal-frame">
+      <div id="tgt-tl" class="target-ring"></div>
+      <div id="tgt-tr" class="target-ring"></div>
+      <div id="tgt-bl" class="target-ring"></div>
+      <div id="tgt-br" class="target-ring"></div>
+    </div>
+
+    <!-- GOALKEEPER (orange) -->
+    <div id="goalkeeper">
+      <div class="gk-head"></div>
+      <div class="gk-torso-wrap">
+        <div class="gk-arm-l"><div class="gk-glove"></div></div>
+        <div class="gk-body"></div>
+        <div class="gk-arm-r"><div class="gk-glove"></div></div>
+      </div>
+      <div class="gk-lower">
+        <div class="gk-pant-l"><div class="gk-shin-l"><div class="gk-boot-l"></div></div></div>
+        <div class="gk-pant-r"><div class="gk-shin-r"><div class="gk-boot-r"></div></div></div>
+      </div>
+    </div>
+
+    <!-- PENALTY TAKER (blue) -->
+    <div id="penalty-taker">
+      <div class="pt-head"></div>
+      <div class="pt-torso-wrap">
+        <div class="pt-arm-l"></div>
+        <div class="pt-body"></div>
+        <div class="pt-arm-r"></div>
+      </div>
+      <div class="pt-lower">
+        <div class="pt-pant-l"><div class="pt-shin-l"><div class="pt-boot-l"></div></div></div>
+        <div class="pt-pant-r"><div class="pt-shin-r"><div class="pt-boot-r"></div></div></div>
+      </div>
+    </div>
+
+    <div id="aim-system"><div id="aim-pointer"></div></div>
+    <div id="curve-indicator"></div>
+    <div id="curve-path"></div>
+    <div id="ball-trail"></div>
+    <div id="soccer-ball"></div>
+
+    <div id="power-wrap">
+      <div id="power-label2">POWER</div>
+      <div style="position:relative">
+        <div id="sweet-bracket">▲SWEET</div>
+        <div id="power-segments"></div>
+      </div>
+      <div id="power-val">0</div>
+    </div>
+
+    <div id="shot-selector">
+      <button class="shot-btn active" onclick="setShotType('normal')"  id="btn-normal">⚽ NORMAL</button>
+      <button class="shot-btn"        onclick="setShotType('curveL')"  id="btn-curveL">↩ CURL L</button>
+      <button class="shot-btn"        onclick="setShotType('curveR')"  id="btn-curveR">↪ CURL R</button>
+      <button class="shot-btn"        onclick="setShotType('chip')"    id="btn-chip">⬆ CHIP</button>
+    </div>
+
+    <div id="shot-tracker"></div>
+    <div id="status-announcer">GOAL!</div>
+    <div id="streak-popup"></div>
+    <div id="phase-label">LOCK AIM</div>
+    <button id="action-btn">START</button>
+
+    <div id="instr">
+      <span>Phase 1:</span> Step back (click)<br>
+      <span>Phase 2:</span> Lock aim<br>
+      <span>Phase 3:</span> Set power<br>
+      <span>Phase 4:</span> KICK!<br>
+      Hit <span>corner targets</span> for bonus!<br>
+      <span>Yellow</span> = sweet spot power
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  GAME STATES
+// ═══════════════════════════════════════
+// S_SETUP  — taker at spot, keeper centred still → click "STEP BACK"
+// S_STEPBACK — taker walks back, aim arrow visible, keeper starts patrol
+// S_AIM    — aim oscillates → click to lock
+// S_POWER  — power oscillates → click to set
+// S_RUNUP  — taker runs forward, ~0.4s, then ball launches
+// S_FLIGHT — ball in air, keeper dives
+// S_END    — result, click to reset
+const S_SETUP=0,S_AIM=1,S_POWER=2,S_RUNUP=3,S_FLIGHT=4,S_END=5;
+let gameState=S_SETUP;
+
+// ═══════════════════════════════════════
+//  SCORE
+// ═══════════════════════════════════════
+let score=0,highScore=0,bonusMult=1.0,streak=0,shotsTotal=0;
+const shotHistory=[];
+
+// ═══════════════════════════════════════
+//  DIFFICULTY
+// ═══════════════════════════════════════
+const DIFFS={
+  easy  :{spd:6, react:0.70,acc:0.75,diveReach:0.82},
+  medium:{spd:10,react:0.45,acc:0.93,diveReach:1.05},
+  hard  :{spd:14,react:0.25,acc:1.00,diveReach:1.25},
+};
+let diff=DIFFS.easy;
+function setDiff(d){
+  if(gameState!==S_SETUP&&gameState!==S_END)return;
+  diff=DIFFS[d];
+  document.querySelectorAll('.diff-btn').forEach(b=>
+    b.classList.toggle('active',b.textContent.toLowerCase()===d));
+}
+
+// ═══════════════════════════════════════
+//  SHOT TYPE
+// ═══════════════════════════════════════
+let shotType='normal';
+function setShotType(t){
+  if(gameState!==S_AIM&&gameState!==S_SETUP)return;
+  shotType=t;
+  document.querySelectorAll('.shot-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+t).classList.add('active');
+  updateCurvePreview();
+}
+
+// ═══════════════════════════════════════
+//  AIM
+// ═══════════════════════════════════════
+let aimAngle=0,aimDir=1;
+const AIM_SPEED=1.9;
+
+// ═══════════════════════════════════════
+//  POWER — segmented
+// ═══════════════════════════════════════
+const SEG_COUNT=20;
+const SEG_ZONES=['green','green','green','green','green','green','green',
+                 'yellow','yellow','yellow','yellow','yellow','yellow',
+                 'red','red','red','red','red',
+                 'purple','purple','purple'];
+let powerLevel=0,powerDir=1;
+const POWER_SPEED=3.6;
+
+const segContainer=document.getElementById('power-segments');
+const segEls=[];
+for(let i=0;i<SEG_COUNT;i++){
+  const d=document.createElement('div');
+  d.className='pseg zone-'+SEG_ZONES[i];
+  segContainer.appendChild(d);
+  segEls.push(d);
+}
+const SEG_H=15; // seg height + gap
+document.getElementById('sweet-bracket').style.bottom=(7*SEG_H)+'px';
+
+function updatePowerDisplay(){
+  const lit=Math.round(powerLevel/100*SEG_COUNT);
+  segEls.forEach((el,i)=>el.classList.toggle('lit',i<lit));
+  document.getElementById('power-val').textContent=Math.round(powerLevel);
+}
+
+// ═══════════════════════════════════════
+//  BALL
+// ═══════════════════════════════════════
+// Ball starts on penalty spot (px ~500, bottom ~65)
+const BALL_START_X=484, BALL_START_Y=495;
+let ballX=BALL_START_X,ballY=BALL_START_Y,ballZ=1.0;
+let velX=0,velY=0,velZ=-0.025;
+// MAGNUS EFFECT curl: spin angular velocity decays over time
+let spinRate=0;       // deg/frame — determines horizontal force
+let spinDecay=0.97;   // spin fades as ball rises
+const GRAVITY=0.25,DRAG=0.991;
+let isDeflected=false,ballRot=0;
+
+// trail history
+const TRAIL_LEN=8;
+const trailPositions=[];
+
+// ═══════════════════════════════════════
+//  GOALKEEPER
+// ═══════════════════════════════════════
+const GK_CENTER_X=460; // centred in goal (goal left=80, width=840, so centre=500-40=460)
+const GK_BASE_Y=148;
+const GK_LEFT=85,GK_RIGHT=835,GK_W=80;
+
+let gkX=GK_CENTER_X,gkY=GK_BASE_Y,gkRot=0;
+let gkPatDir=1;
+// physics
+let gkVelX=0,gkVelY=0,gkVelRot=0;
+let gkOnGround=false;
+const GK_GRAV=0.52;
+const GK_FRICTION=0.80;
+const GK_BOUNCE=0.25;
+const GK_GROUND_Y=205;
+let gkAction='center';
+let gkDiveGo=false;
+let gkPose='';
+// keeper patrol only starts after taker steps back
+let keeperPatrolling=false;
+
+// ═══════════════════════════════════════
+//  PENALTY TAKER position
+// ═══════════════════════════════════════
+const PT_SPOT_LEFT=445; // farther from ball
+const PT_BACK_LEFT=465; // same X but lower (stepped back)
+const PT_SPOT_BOTTOM=40;
+const PT_BACK_BOTTOM=40;
+// step-back offset
+let takerSteppedBack=false;
+
+// ═══════════════════════════════════════
+//  DOM REFS
+// ═══════════════════════════════════════
+const elBall    =document.getElementById('soccer-ball');
+const elGk      =document.getElementById('goalkeeper');
+const elAim     =document.getElementById('aim-system');
+const elBtn     =document.getElementById('action-btn');
+const elAnnounce=document.getElementById('status-announcer');
+const elStreak  =document.getElementById('streak-popup');
+const elNetRipple=document.getElementById('net-ripple');
+const elShotTracker=document.getElementById('shot-tracker');
+const elPT      =document.getElementById('penalty-taker');
+const elPhase   =document.getElementById('phase-label');
+const elCurvePath=document.getElementById('curve-path');
+const elCurveInd =document.getElementById('curve-indicator');
+const elTrail   =document.getElementById('ball-trail');
+
+// ═══════════════════════════════════════
+//  KEEPER POSITION
+// ═══════════════════════════════════════
+function applyGk(){
+  elGk.style.left=Math.round(gkX)+'px';
+  elGk.style.top =Math.round(gkY)+'px';
+  elGk.style.transform=`rotate(${gkRot}deg)`;
+}
+
+function patrolKeeper(){
+  if(!keeperPatrolling)return;
+  gkX+=diff.spd*gkPatDir;
+  if(gkX<=GK_LEFT){gkX=GK_LEFT;gkPatDir=1}
+  else if(gkX>=GK_RIGHT){gkX=GK_RIGHT;gkPatDir=-1}
+  gkY=GK_BASE_Y;gkRot=0;
+  applyGk();
+}
+
+// ═══════════════════════════════════════
+//  KEEPER AI
+// ═══════════════════════════════════════
+function decideKeeper(predX,predY){
+  const err=(1-diff.acc)*160;
+  const nx=predX+(Math.random()-.5)*err*2;
+  const ny=predY+(Math.random()-.5)*err;
+
+  const cx=gkX+GK_W/2;
+  const dx=nx-cx;
+  const adx=Math.abs(dx);
+  const isLow=ny>170;
+  const isNear=adx<75;
+
+  // Buffed: reach scales with difficulty
+  const maxReach=300*diff.diveReach;
+
+  if(isLow&&isNear){
+    gkAction='crouch'; setPose('crouch');
+    const tx=nx-GK_W/2;
+    gkVelX=(tx-gkX)*0.06;
+    gkVelY=0.6; gkVelRot=0;
+  } else if(isLow&&!isNear){
+    gkAction=dx<0?'slide-left':'slide-right'; setPose(gkAction);
+    const clampDx=Math.sign(dx)*Math.min(adx,maxReach);
+    gkVelX=clampDx*diff.react*0.068;
+    gkVelY=0.3;
+    gkVelRot=dx<0?-4.2:4.2;
+  } else {
+    gkAction=dx<0?'dive-left':'dive-right'; setPose(gkAction);
+    const clampDx=Math.sign(dx)*Math.min(adx,maxReach);
+    gkVelX=clampDx*diff.react*0.072;
+    // launch height: higher for top-corner shots
+    gkVelY=ny<120?-10:(ny<160?-6:-2);
+    gkVelRot=dx<0?-2.0:2.0;
+  }
+  gkDiveGo=true;
+}
+
+function setPose(p){
+  elGk.classList.remove('gk-pose-dive-left','gk-pose-dive-right',
+    'gk-pose-crouch','gk-pose-slide-left','gk-pose-slide-right');
+  if(p) elGk.classList.add('gk-pose-'+p);
+  gkPose=p;
+}
+
+function physicsKeeper(){
+  if(!gkDiveGo)return;
+  const isCrouch=gkAction==='crouch';
+  const groundY=isCrouch?GK_BASE_Y+10:GK_GROUND_Y;
+
+  gkVelY+=GK_GRAV;
+  gkX+=gkVelX;
+  gkY+=gkVelY;
+  gkRot+=gkVelRot;
+
+  if(gkY>=groundY){
+    gkY=groundY;
+    if(Math.abs(gkVelY)>2.5){
+      gkVelY=-gkVelY*GK_BOUNCE;
+    } else {
+      gkVelY=0; gkOnGround=true;
+    }
+    gkVelX*=GK_FRICTION;
+    gkVelRot*=0.58;
+    if(Math.abs(gkVelRot)<0.15) gkVelRot=0;
+  }
+  if(gkX<GK_LEFT){gkX=GK_LEFT;gkVelX=Math.abs(gkVelX)*0.3}
+  if(gkX>GK_RIGHT){gkX=GK_RIGHT;gkVelX=-Math.abs(gkVelX)*0.3}
+  applyGk();
+}
+
+// ═══════════════════════════════════════
+//  CURVE PATH PREVIEW
+// ═══════════════════════════════════════
+function updateCurvePreview(){
+  const isCurl=shotType==='curveL'||shotType==='curveR';
+  elCurvePath.classList.toggle('visible',isCurl&&gameState===S_AIM);
+  elCurveInd.classList.toggle('visible',isCurl&&gameState===S_AIM);
+  if(isCurl&&gameState===S_AIM){
+    elCurveInd.textContent=shotType==='curveL'?'↩ CURL L':'↪ CURL R';
+    drawCurvePath();
+  } else {
+    elCurvePath.innerHTML='';
+  }
+}
+
+function drawCurvePath(){
+  elCurvePath.innerHTML='';
+  // Simulate ball path with current aim & average power (50)
+  const rad=(aimAngle*Math.PI)/180;
+  const simPow=55;
+  const forceMod=10.5+simPow*0.14;
+  let pvx=Math.sin(rad)*forceMod;
+  let pvy=-Math.sqrt(simPow)*0.85-simPow*0.195;
+  let pvz=-0.0145;
+  const curlSign=shotType==='curveL'?-1:1;
+  // Magnus: spin creates sideways force proportional to spin rate
+  let pspin=curlSign*2.8; // initial spin
+  let px=ballX,py=ballY,pz=1.0;
+  for(let i=0;i<38;i+=3){
+    // Magnus force
+    pvx+=pspin*0.065*pz;
+    pspin*=0.96;
+    pvx*=DRAG; pvy*=DRAG;
+    pvy+=GRAVITY;
+    px+=pvx; py+=pvy; pz+=pvz;
+    if(pz<0.52)break;
+    const sc=pz*0.7+0.3;
+    const dot=document.createElement('div');
+    dot.className='curve-ghost';
+    dot.style.cssText=`left:${px}px;top:${py}px;width:${14*sc}px;height:${14*sc}px;opacity:${0.15+i*0.012}`;
+    elCurvePath.appendChild(dot);
+  }
+}
+
+// ═══════════════════════════════════════
+//  AIM UPDATE
+// ═══════════════════════════════════════
+function updateAim(){
+  if(gameState!==S_AIM)return;
+  aimAngle+=AIM_SPEED*aimDir;
+  if(aimAngle>75){aimAngle=75;aimDir=-1}
+  if(aimAngle<-75){aimAngle=-75;aimDir=1}
+  elAim.style.transform=`rotate(${aimAngle}deg)`;
+  if(shotType==='curveL'||shotType==='curveR') drawCurvePath();
+}
+
+// ═══════════════════════════════════════
+//  POWER UPDATE
+// ═══════════════════════════════════════
+function updatePower(){
+  if(gameState!==S_POWER)return;
+  powerLevel+=POWER_SPEED*powerDir;
+  if(powerLevel>=100){powerLevel=100;powerDir=-1}
+  if(powerLevel<=0){powerLevel=0;powerDir=1}
+  updatePowerDisplay();
+  const lit=Math.round(powerLevel/100*SEG_COUNT);
+  if(lit>=SEG_COUNT-2){
+    document.getElementById('power-val').classList.add('flash');
+    setTimeout(()=>document.getElementById('power-val').classList.remove('flash'),300);
+  }
+}
+
+// ═══════════════════════════════════════
+//  BALL TRAIL
+// ═══════════════════════════════════════
+function updateTrail(){
+  trailPositions.push({x:ballX,y:ballY,z:ballZ});
+  if(trailPositions.length>TRAIL_LEN)trailPositions.shift();
+  elTrail.innerHTML='';
+  trailPositions.forEach((p,i)=>{
+    const d=document.createElement('div');
+    d.className='trail-dot';
+    const sc=p.z*0.5;
+    const alpha=(i/TRAIL_LEN)*0.5;
+    const sz=Math.max(4,14*sc);
+    d.style.cssText=`left:${p.x}px;top:${p.y}px;width:${sz}px;height:${sz}px;
+      opacity:${alpha};transform:translate(-50%,-50%)`;
+    elTrail.appendChild(d);
+  });
+}
+
+// ═══════════════════════════════════════
+//  BALL PHYSICS — Magnus curl
+// ═══════════════════════════════════════
+function updateBall(){
+  if(gameState!==S_FLIGHT)return;
+
+  // Magnus Effect: lateral force = spin × velocity × air density factor
+  // spin decays as ball slows, scaled by ballZ (distance proxy)
+  const magnusForce=spinRate*0.12*ballZ;
+  velX+=magnusForce;
+  spinRate*=spinDecay;
+
+  velX*=DRAG; velY*=DRAG;
+  velY+=GRAVITY;
+  ballX+=velX; ballY+=velY; ballZ+=velZ;
+  ballRot+=velX*3;
+
+  const sc=Math.max(0.15,ballZ);
+  elBall.style.left=ballX+'px';
+  elBall.style.top =ballY+'px';
+  elBall.style.transform=`scale(${sc}) rotate(${ballRot}deg)`;
+
+  updateTrail();
+
+  if(gkDiveGo&&ballZ<0.90&&!isDeflected) physicsKeeper();
+  if(!isDeflected&&ballZ<=0.57) checkCollision();
+  if(!isDeflected&&ballZ<=0.52) processResult(ballX,ballY);
+  if(isDeflected&&ballZ>=1.15){gameState=S_END;showNextBtn()}
+}
+
+// ═══════════════════════════════════════
+//  COLLISION
+// ═══════════════════════════════════════
+function checkCollision(){
+  const isCrouch=gkAction==='crouch';
+  const isSlide=gkAction==='slide-left'||gkAction==='slide-right';
+  const spreadH=isCrouch?68:(isSlide?82:32);
+  const spreadVTop=isCrouch?14:58;
+  const left=gkX-spreadH,right=gkX+GK_W+spreadH;
+  const top=gkY-spreadVTop,bot=gkY+165;
+  if(ballX>=left&&ballX<=right&&ballY>=top&&ballY<=bot){
+    isDeflected=true;
+    const lbl=isCrouch?'REFLEX STOP!':(isSlide?'SLIDE SAVE!':'FLYING SAVE!');
+    showBanner(lbl,'#00e5ff');
+    bonusMult=1.0;streak=0;recordShot('save');updateHUD();
+    velX=(ballX-(gkX+40))*0.38;
+    velY=-2.8;velZ=0.022;spinRate=0;
+  }
+}
+
+// ═══════════════════════════════════════
+//  SHOT RESULT
+// ═══════════════════════════════════════
+function processResult(fx,fy){
+  gameState=S_END;showNextBtn();
+  const zone=getPowerZone();
+if(zone==='purple' && Math.random()<0.75){
+    showBanner('TOO MUCH POWER!','#aa00ff');
+    bonusMult=1.0;streak=0;recordShot('miss');updateHUD();return;
+}
+if(fx<80||fx>920||fy<55||fy>275){
+    showBanner(powerLevel>=88?'SKIED IT!':'WIDE / OVER!','#ff1744');
+    bonusMult=1.0;streak=0;recordShot('miss');updateHUD();return;
+  }
+  const isCorner=(fx<240||fx>760)&&(fy<140||fy>212);
+  if(isCorner)bonusMult=Math.min(bonusMult+0.5,4.0);
+  streak++;
+  if(streak>=3)bonusMult=Math.min(bonusMult+0.3,4.0);
+  const earned=Math.round(10*bonusMult);
+  score+=earned;if(score>highScore)highScore=score;
+  recordShot('goal');
+  triggerConfetti(fx,fy);triggerNetRipple();
+  if(isCorner)showBanner(`CORNER! +${earned}`,'#ffd700');
+  else if(streak>=5)showBanner(`🔥 ON FIRE! +${earned}`,'#ff6d00');
+  else if(streak>=3)showBanner(`HAT-TRICK! +${earned}`,'#00e676');
+  else showBanner(`GOAL! +${earned}`,'#00e676');
+  if(streak>=2)showStreakPop(`${streak}× STREAK!`);
+  updateHUD();
+}
+
+
+function getPowerZone(){
+  if(powerLevel < 35) return 'green';
+  if(powerLevel < 65) return 'yellow';
+  if(powerLevel < 85) return 'red';
+  return 'purple';
+}
+
+// ═══════════════════════════════════════
+//  KICK — launch ball
+// ═══════════════════════════════════════
+function kick(){
+  gameState=S_FLIGHT;
+  elAim.style.display='none';
+  elCurvePath.classList.remove('visible');
+  elCurveInd.classList.remove('visible');
+  // Kick animation
+  elPT.classList.add('kicking');
+  setTimeout(()=>elPT.classList.remove('kicking'),500);
+
+  const rad=(aimAngle*Math.PI)/180;
+  const zone=getPowerZone();
+let force;
+if(zone==='green') force=10+powerLevel*0.08;
+else if(zone==='yellow') force=13+powerLevel*0.10;
+else if(zone==='red') force=15+powerLevel*0.12;
+else force=19+powerLevel*0.16;
+  velX=Math.sin(rad)*force;
+
+  switch(shotType){
+    case 'normal':
+      spinRate=0;
+      if(powerLevel>=85){
+        velY=-21-(powerLevel-85)*0.65;velZ=-0.0135;
+      } else {
+        velY=-Math.sqrt(powerLevel)*0.85-powerLevel*0.195;velZ=-0.0145;
+      }
+      break;
+    case 'curveL':
+      // Magnus: positive spin = curls left (clockwise spin seen from above)
+      spinRate=-5.5-(powerLevel*0.03); // negative = leftward force
+      spinDecay=0.965;
+      velY=-Math.sqrt(powerLevel)*0.82-powerLevel*0.17;velZ=-0.014;
+      break;
+    case 'curveR':
+      spinRate=+5.5+(powerLevel*0.03);
+      spinDecay=0.965;
+      velY=-Math.sqrt(powerLevel)*0.82-powerLevel*0.17;velZ=-0.014;
+      break;
+    case 'chip':
+      spinRate=0;
+      velY=-Math.sqrt(powerLevel)*1.5-8;velZ=-0.011;velX*=0.55;
+      break;
+  }
+
+  // Simulate trajectory for keeper AI
+  const framesToNet=(0.52-1.0)/velZ;
+  let px=ballX,py=ballY,pvx=velX,pvy=velY,pspin=spinRate,pz=1.0,pvz=velZ;
+  for(let f=0;f<framesToNet;f++){
+    pvx+=pspin*0.072*pz; pspin*=spinDecay;
+    pvx*=DRAG;pvy*=DRAG;pvy+=GRAVITY;
+    px+=pvx;py+=pvy;pz+=pvz;
+  }
+
+  shotsTotal++;
+  const reactF=Math.floor(framesToNet*(1-diff.react));
+  let fc=0;
+  const wait=()=>{fc++;fc<reactF?requestAnimationFrame(wait):decideKeeper(px,py)};
+  requestAnimationFrame(wait);
+}
+
+// ═══════════════════════════════════════
+//  RUN-UP sequence
+// ═══════════════════════════════════════
+function startRunUp(){
+  gameState=S_RUNUP;
+  setPhaseLabel('');
+  elBtn.style.display='none';
+  elPT.classList.add('running');
+  // After run-up animation, launch ball
+  setTimeout(()=>{
+    kick();
+  },450);
+}
+
+// ═══════════════════════════════════════
+//  STEP BACK
+// ═══════════════════════════════════════
+function doStepBack(){
+  gameState=S_STEPBACK;
+  setPhaseLabel('LOCK AIM');
+  elBtn.innerText='LOCK AIM';
+  keeperPatrolling=false;
+  // Animate taker stepping back: move down
+  elPT.style.bottom=(PT_BACK_BOTTOM+80)+'px';
+  elPT.style.left=(PT_BACK_LEFT-30)+'px';
+  elAim.style.display='block';
+  elCurvePath.innerHTML='';
+  // After step-back animation ends, enter AIM state
+  setTimeout(()=>{
+    gameState=S_AIM;
+    setPhaseLabel('LOCK AIM');
+  },520);
+}
+
+// ═══════════════════════════════════════
+//  INPUT HANDLER
+// ═══════════════════════════════════════
+function handleInput(){
+
+  if(gameState===S_SETUP){
+    gameState=S_AIM;
+    keeperPatrolling=false;
+    elAim.style.display='block';
+    setPhaseLabel('LOCK AIM');
+    elBtn.innerText='LOCK AIM';
+    updateCurvePreview();
+    return;
+  }
+
+  if(gameState===S_AIM){
+    gameState=S_POWER;
+    setPhaseLabel('SET POWER');
+    elBtn.innerText='KICK!';
+    elCurvePath.classList.remove('visible');
+    elCurveInd.classList.remove('visible');
+    return;
+  }
+
+  if(gameState===S_POWER){
+    startRunUp();
+    return;
+  }
+
+  if(gameState===S_END){
+    resetRound();
+  }
+}
+
+document.getElementById('action-btn').addEventListener('click',handleInput);
+
+// ═══════════════════════════════════════
+//  RESET
+// ═══════════════════════════════════════
+function resetRound(){
+  gameState=S_SETUP;
+  powerLevel=0;powerDir=1;
+  gkDiveGo=false;gkAction='center';isDeflected=false;
+  spinRate=0;ballRot=0;
+  gkVelX=0;gkVelY=0;gkVelRot=0;gkRot=0;gkOnGround=false;
+  gkY=GK_BASE_Y;gkX=GK_CENTER_X;
+  keeperPatrolling=false;
+
+  ballX=BALL_START_X;ballY=BALL_START_Y;ballZ=1.0;velX=0;velY=0;
+
+  elAnnounce.classList.remove('active');
+  elStreak.classList.remove('active');
+  setPose('');
+  elGk.classList.remove('no-transition');
+  elGk.style.transition='';
+  applyGk();
+
+  elBall.style.left=ballX+'px';
+  elBall.style.top =ballY+'px';
+  elBall.style.transform='scale(1) rotate(0deg)';
+  elTrail.innerHTML='';
+
+  // Reset taker to spot
+  elPT.style.bottom=PT_SPOT_BOTTOM+'px';
+  elPT.style.left=PT_SPOT_LEFT+'px';
+  elPT.classList.remove('running','kicking');
+
+  elAim.style.display='none';
+  elCurvePath.innerHTML='';
+  elCurvePath.classList.remove('visible');
+  elCurveInd.classList.remove('visible');
+
+  updatePowerDisplay();
+  setPhaseLabel('STEP BACK');
+  elBtn.style.display='block';
+  elBtn.innerText='STEP BACK';
+}
+
+function setPhaseLabel(txt){
+  elPhase.textContent=txt;
+}
+function showNextBtn(){
+  elBtn.style.display='block';elBtn.innerText='NEXT SHOT';
+}
+
+// ═══════════════════════════════════════
+//  HUD
+// ═══════════════════════════════════════
+function updateHUD(){
+  document.getElementById('ui-score').textContent=score;
+  document.getElementById('ui-high').textContent=highScore;
+  document.getElementById('ui-mult').textContent=bonusMult.toFixed(1)+'x';
+  document.getElementById('ui-streak').textContent=streak;
+  document.getElementById('ui-shots').textContent=shotsTotal;
+  updateShotTracker();
+}
+function showBanner(txt,col){
+  elAnnounce.textContent=txt;elAnnounce.style.color=col;
+  elAnnounce.classList.add('active');
+  setTimeout(()=>elAnnounce.classList.remove('active'),1600);
+}
+function showStreakPop(txt){
+  elStreak.textContent=txt;elStreak.classList.add('active');
+  setTimeout(()=>elStreak.classList.remove('active'),1200);
+}
+function recordShot(t){shotHistory.push(t);if(shotHistory.length>10)shotHistory.shift()}
+function updateShotTracker(){
+  elShotTracker.innerHTML='';
+  for(let i=shotHistory.length-1;i>=0;i--){
+    const d=document.createElement('div');
+    d.className='shot-dot '+shotHistory[i];
+    elShotTracker.appendChild(d);
+  }
+}
+
+// ═══════════════════════════════════════
+//  CONFETTI + NET
+// ═══════════════════════════════════════
+const CC=['#ffd700','#00e676','#00e5ff','#ff6d00','#ff1744','#fff'];
+function triggerConfetti(cx,cy){
+  const gc=document.getElementById('game-container');
+  for(let i=0;i<32;i++){
+    const el=document.createElement('div');
+    el.className='confetti-piece';
+    const dx=(Math.random()-.5)*280,dy=-90-Math.random()*130;
+    el.style.cssText=`left:${cx+Math.random()*60-30}px;top:${cy+Math.random()*20-10}px;
+      background:${CC[Math.floor(Math.random()*CC.length)]};
+      transform:rotate(${Math.random()*360}deg);
+      animation:cfly ${0.7+Math.random()*0.5}s ease-out forwards;
+      --dx:${dx}px;--dy:${dy}px`;
+    gc.appendChild(el);
+    setTimeout(()=>el.remove(),1400);
+  }
+}
+const cs=document.createElement('style');
+cs.textContent=`@keyframes cfly{
+  0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:1}
+  100%{transform:translate(var(--dx),var(--dy)) rotate(540deg) scale(0.2);opacity:0}}`;
+document.head.appendChild(cs);
+
+function triggerNetRipple(){
+  elNetRipple.classList.remove('active');
+  void elNetRipple.offsetWidth;
+  elNetRipple.classList.add('active');
+}
+
+// ═══════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════
+function loop(){
+  if(gameState===S_AIM||gameState===S_POWER) patrolKeeper();
+  updateAim();
+  updatePower();
+  updateBall();
+  requestAnimationFrame(loop);
+}
+
+// Init
+elAim.style.display='none';
+elBall.style.left=BALL_START_X+'px';
+elBall.style.top=BALL_START_Y+'px';
+gkX=GK_CENTER_X;gkY=GK_BASE_Y;
+applyGk();
+updateHUD();
+loop();
+</script>
+</body>
+</html>
